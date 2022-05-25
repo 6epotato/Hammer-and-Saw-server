@@ -3,6 +3,7 @@ const cors = require('cors')
 const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const app = express()
 const port = process.env.PORT || 5000;
 
@@ -39,6 +40,31 @@ async function run() {
         const toolCollection = client.db('HammerAndSaw').collection('tool');
         const purchaseCollection = client.db('HammerAndSaw').collection('purchase');
         const userCollection = client.db('HammerAndSaw').collection('user');
+        const paymentCollection = client.db('HammerAndSaw').collection('payment');
+
+        //verify admin middle ware
+        const verifyAdmin = async (req, res, next) => {
+            const requester = req.decoded.email;
+            const requesterAccount = await userCollection.findOne({ email: requester });
+            if (requesterAccount.role === 'admin') {
+                next();
+            }
+            else {
+                res.status(403).send({ message: 'forbidden' });
+            }
+        }
+        // card intent
+        app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+            const purchase = req.body;
+            const price = purchase.price;
+            const amount = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
+            });
+            res.send({ clientSecret: paymentIntent.client_secret })
+        });
 
         // find all element
         app.get('/tool', async (req, res) => {
@@ -86,22 +112,14 @@ async function run() {
 
 
         // make user admin
-        app.put('/user/admin/:email', verifyJWT, async (req, res) => {
+        app.put('/user/admin/:email', verifyJWT, verifyAdmin, async (req, res) => {
             const email = req.params.email;
-            const requester = req.decoded.email;
-            const requesterAccount = await userCollection.findOne({ email: requester });
-            if (requesterAccount.role === 'admin') {
-                const filter = { email: email };
-                const updateDoc = {
-                    $set: { role: 'admin' },
-                };
-                const result = await userCollection.updateOne(filter, updateDoc);
-                res.send(result);
-            }
-            else {
-                res.status(403).send({ message: 'forbidden' });
-            }
-
+            const filter = { email: email };
+            const updateDoc = {
+                $set: { role: 'admin' },
+            };
+            const result = await userCollection.updateOne(filter, updateDoc);
+            res.send(result);
         })
 
         // add item to database 
@@ -125,12 +143,44 @@ async function run() {
             }
 
         })
+        // delete items
+        app.delete('/purchase/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
+            const result = await purchaseCollection.deleteOne(query);
+            res.send(result);
+        })
+
+        //find out the payment for a single products
+
+        app.get('/purchase/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const purchase = await purchaseCollection.findOne(query);
+            res.send(purchase);
+        })
 
         //post all the purchase items information
         app.post('/purchase', async (req, res) => {
             const purchase = req.body;
             const result = await purchaseCollection.insertOne(purchase);
             res.send(result);
+        })
+
+        app.patch('/purchase/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const payment = req.body;
+            const filter = { _id: ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId
+                }
+            }
+
+            const result = await paymentCollection.insertOne(payment);
+            const updatedBooking = await purchaseCollection.updateOne(filter, updatedDoc);
+            res.send(updatedBooking);
         })
 
 
