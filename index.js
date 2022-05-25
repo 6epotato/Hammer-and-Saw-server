@@ -104,6 +104,13 @@ async function run() {
 
         })
 
+        // add item to database 
+        app.post('/tool', verifyJWT, async (req, res) => {
+            const item = req.body;
+            const result = await toolCollection.insertOne(item);
+            res.send(result);
+        });
+
         // find out a single users order
         app.get('/purchase', verifyJWT, async (req, res) => {
             const customer = req.query.customer;
