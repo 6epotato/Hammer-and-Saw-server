@@ -84,6 +84,15 @@ async function run() {
             const tool = await toolCollection.findOne(query);
             res.send(tool);
         })
+
+        //delete single items
+        app.delete('/tool/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
+            const result = await toolCollection.deleteOne(query);
+            res.send(result);
+        })
+
         // upsert a user
         app.put('/user/:email', async (req, res) => {
             const email = req.params.email;
