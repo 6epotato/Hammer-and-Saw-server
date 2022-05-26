@@ -41,6 +41,8 @@ async function run() {
         const purchaseCollection = client.db('HammerAndSaw').collection('purchase');
         const userCollection = client.db('HammerAndSaw').collection('user');
         const paymentCollection = client.db('HammerAndSaw').collection('payment');
+        const profileCollection = client.db('HammerAndSaw').collection('profile');
+        const reviewCollection = client.db('HammerAndSaw').collection('review');
 
         //verify admin middle ware
         const verifyAdmin = async (req, res, next) => {
@@ -73,6 +75,7 @@ async function run() {
             const tools = await cursor.toArray();
             res.send(tools);
         })
+
 
         // find a single element by id 
         app.get('/tool/:id', async (req, res) => {
@@ -128,6 +131,8 @@ async function run() {
             const result = await toolCollection.insertOne(item);
             res.send(result);
         });
+        // purchase all product
+
 
         // find out a single users order
         app.get('/purchase', verifyJWT, async (req, res) => {
@@ -143,6 +148,7 @@ async function run() {
             }
 
         })
+
         // delete items
         app.delete('/purchase/:id', async (req, res) => {
             const id = req.params.id;
@@ -165,6 +171,45 @@ async function run() {
             const purchase = req.body;
             const result = await purchaseCollection.insertOne(purchase);
             res.send(result);
+        })
+        //profile collection
+        app.post('/profile', async (req, res) => {
+            const profile = req.body;
+            const result = await profileCollection.insertOne(profile);
+            res.send(result);
+        })
+        //update profile 
+        app.put('/profile/:id', async (req, res) => {
+            const id = req.params.id;
+            const phone = req.body.phone;
+            const address = req.body.address;
+            const education = req.body.education;
+            const profile = req.body.linkdin
+            const filter = { _id: ObjectId(id) };
+            const updateDoc = {
+                $set: {
+                    phone: phone,
+                    address: address,
+                    education: education,
+                    linkdin: profile
+                },
+            };
+            const result = await profileCollection.updateOne(filter, updateDoc);
+            res.send(result);
+        })
+
+        //review collection
+        app.post('/review', async (req, res) => {
+            const review = req.body;
+            const result = await reviewCollection.insertOne(review);
+            res.send(result);
+        })
+        //get review
+        app.get('/review', async (req, res) => {
+            const query = {};
+            const cursor = reviewCollection.find(query);
+            const review = await cursor.toArray();
+            res.send(review);
         })
 
         app.patch('/purchase/:id', verifyJWT, async (req, res) => {
